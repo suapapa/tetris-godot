@@ -1,6 +1,6 @@
 # Tetris — Godot 4
 
-A complete, single-file Tetris built on Godot 4.7.
+A complete Tetris built on Godot 4.7, organized across small single-responsibility scripts.
 
 ## Run
 
@@ -45,5 +45,9 @@ Expected: `RESULTS: 24 passed, 0 failed` → `ALL TESTS PASSED`.
 
 - `project.godot` — project + display/window settings
 - `scenes/main.tscn` — main scene
-- `scripts/game.gd` — entire game (logic + rendering, all `_draw()`-based)
+- `scripts/game.gd` — orchestrator: state machine, input, gravity/lock timers, 7-bag, scoring
+- `scripts/game_constants.gd` — layout, shapes, colors, key codes, states (pure data)
+- `scripts/piece.gd` — active piece: shape + position + rotation math
+- `scripts/board.gd` — grid: collision checks, locking cells, line detection/clearing
+- `scripts/renderer.gd` — all `_draw()`-based rendering (field, HUD, ghost, overlays)
 - `scripts/test_logic.gd` — headless functional test (run via `--script`)

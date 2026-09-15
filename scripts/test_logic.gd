@@ -4,6 +4,9 @@ extends SceneTree
 ##
 ## Instantiates the real game script and drives its public/private logic
 ## methods directly, asserting that core Tetris mechanics behave correctly.
+##
+## After the multi-file split: board state lives in game.board (Board),
+## the active piece is a Piece object with .cells/.x/.y attributes.
 
 var passed := 0
 var failed := 0
@@ -32,60 +35,56 @@ func _init() -> void:
 	game._ready()
 
 	# 2. Grid sanity
-	_check(game.grid.size() == 20, "grid has 20 rows")
-	_check(game.grid[0].size() == 10, "row has 10 cols")
+	_check(game.board.grid.size() == 20, "grid has 20 rows")
+	_check(game.board.grid[0].size() == 10, "row has 10 cols")
 	_check(game.state == 0, "starts in READY state (value 0)")
 	# Begin a game
 	game.reset_game()
 	_check(game.state == 1, "after reset, in PLAYING state (value 1)")
-	_check(not game.current.is_empty(), "a piece was spawned")
-	_check(game.current["name"] in ["I", "O", "T", "S", "Z", "J", "L"], "spawned a valid piece")
+	_check(game.current != null, "a piece was spawned")
+	_check(game.current.name in ["I", "O", "T", "S", "Z", "J", "L"], "spawned a valid piece")
 
-	# 3. _valid_cells boundary checks
-	_check(game._valid_cells([[0, 0]]) == true, "cell inside grid is valid")
-	_check(game._valid_cells([[-1, 0]]) == false, "col < 0 rejected")
-	_check(game._valid_cells([[10, 0]]) == false, "col >= 10 rejected")
-	_check(game._valid_cells([[0, 20]]) == false, "row >= 20 rejected")
+	# 3. Board collision boundary checks
+	_check(game.board.is_valid_cells([[0, 0]]) == true, "cell inside grid is valid")
+	_check(game.board.is_valid_cells([[-1, 0]]) == false, "col < 0 rejected")
+	_check(game.board.is_valid_cells([[10, 0]]) == false, "col >= 10 rejected")
+	_check(game.board.is_valid_cells([[0, 20]]) == false, "row >= 20 rejected")
 
 	# 4. Rotation preserves block count
-	var orig_cells: Array = game.current["cells"]
-	var orig_size: int = orig_cells.size()
+	var orig_size: int = game.current.cells.size()
 	for dir in [1, -1, 1, -1]:
 		game._rotate(dir)
-	_check(game.current["cells"].size() == orig_size, "rotation preserves 4 blocks")
+	_check(game.current.cells.size() == orig_size, "rotation preserves 4 blocks")
 
 	# 5. Movement keeps piece in bounds
-	var before_x: int = game.current["x"]
+	var before_x: int = game.current.x
 	game._try_move(-1, 0)
 	game._try_move(1, 0)
-	var back_x: int = game.current["x"]
-	_check(back_x == before_x, "left then right returns x (no wall loss)")
+	_check(game.current.x == before_x, "left then right returns x (no wall loss)")
 
 	# 6. Line clear + scoring: fill bottom row, leave one gap, drop piece there
 	game.reset_game()
 	# Fill row 19 completely except column 0.
 	for c in range(1, 10):
-		game.grid[19][c] = "O"
+		game.board.grid[19][c] = "O"
 	# Force current to be an O (2x2) positioned so one block lands in col 0 row 19.
-	game.current = {"name": "O", "cells": [[0, 0], [1, 0], [0, 1], [1, 1]], "x": -0, "y": 18}
-	# O at x=0,y=18 occupies (0,18)(1,18)(0,19)(1,19). Row19 already full at cols1-9,
-	# col0 empty -> after lock, row19 becomes full.
+	game.current = Piece.new("O", [[0, 0], [1, 0], [0, 1], [1, 1]], 0, 18)
 	var lines_before: int = game.lines_cleared
 	var score_before: int = game.score
 	game._lock_piece()
 	_check(game.lines_cleared == lines_before + 1, "full bottom row cleared")
 	_check(game.score > score_before, "score increased on line clear")
-	_check(game.grid[19][0] == "" or game.lines_cleared > lines_before, "cleared row no longer full")
+	_check(game.board.grid[19][0] == "" or game.lines_cleared > lines_before, "cleared row no longer full")
 
-	# 7. Game over: fill the whole stack, spawning should end the game
+	# 7. Game over: spawning into a full board should end the game
 	game.reset_game()
 	for r in range(20):
 		for c in range(10):
-			game.grid[r][c] = "I"
-	game.current = {"name": "I", "cells": [[0, 0], [1, 0], [2, 0], [3, 0]], "x": 0, "y": 0}
+			game.board.grid[r][c] = "I"
+	game.current = Piece.new("I", [[0, 0], [1, 0], [2, 0], [3, 0]], 0, 0)
 	game._game_over()
 	_check(game.state == 3, "game over state set (value 3)")
-	_check(game.current.is_empty(), "current piece cleared on game over")
+	_check(game.current == null, "current piece cleared on game over")
 
 	# 8. Reset restores a playable board
 	game.reset_game()
